@@ -1,0 +1,214 @@
+---
+title: "Homework 2"
+author: "Stephanie Gluck"
+date: "2/22/2020"
+output: 
+  html_document: 
+    theme: cerulean
+---
+
+```{r setup}
+library(rio)
+library(tidyverse)
+library(ggplot2)
+library(ggtext)
+library(here)
+library(scales)
+library(janitor)
+library(colorblindr)
+library(gt)
+
+theme_set(theme_minimal(base_size = 15))
+
+```
+
+```{r load_data}
+
+pth <- here("crime.csv")
+d <- import(pth) %>% clean_names() 
+
+```
+
+## 1. Reproduce Crime Plot 
+
+```{r reproduce_plot, fig.width = 7, fig.height = 8}
+
+plot_d <- d %>% 
+  filter(is_crime == 1) %>% 
+  mutate(total = n()) %>% 
+  group_by(offense_category_id, total) %>% 
+  count() %>%  
+  ungroup() %>% 
+  mutate(prop = n/total, 
+         se = sqrt(prop*(1-prop)/n), 
+         offense_category_id = str_to_title(str_replace_all(offense_category_id, "-", " ")))
+
+head(plot_d)
+
+ggplot(plot_d, aes(x = reorder(offense_category_id, prop), prop)) +
+  geom_errorbar(aes(ymin = prop + qnorm(0.025)*se, 
+                    ymax = prop + qnorm(0.975)*se),
+                color = "gray40", 
+                width = 0.4) +
+  geom_point(color = "royalblue1") +
+  coord_flip() +
+  expand_limits(y = .3) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(plot.title.position = "plot") +
+  labs(x = "",
+       y = "Percentage",
+       title = "Crimes in Denver", 
+       caption = "Denver Crime Data Distributed via Kaggle\nhttps://www.kaggle.com/paultimothymooney/denver-crime-data")
+
+```
+
+## 2. Alternative Uncertainty Visualization 
+
+```{r alternate_plot, fig.width = 10, fig.height = 8}
+
+ggplot(plot_d, aes(x = reorder(offense_category_id, prop), prop)) + 
+  geom_col(fill = "#f768a1") + 
+  geom_errorbar(aes(ymin = ifelse(prop + qnorm(0.025)*se <0,
+                                  0, 
+                                  prop + qnorm(0.025)*se), 
+                    ymax = prop + qnorm(0.975)*se),
+                color = "gray40", 
+                width = 0.4, 
+                size = 0.8) +
+  coord_flip() +
+  expand_limits(y = .3) + 
+  scale_y_continuous(labels = scales::percent) +
+  theme(plot.title.position = "plot") +
+  labs(x = "",
+       y = "Percentage",
+       title = "Crimes in Denver", 
+       caption = "Denver Crime Data Distributed via Kaggle\nhttps://www.kaggle.com/paultimothymooney/denver-crime-data")
+
+```
+
+## 3. Reproduce Plot, crime proportion by years and district
+
+```{r crime_year, fig.width = 10, fig.height = 8}
+
+
+plot_d2 <- d %>% 
+  filter(is_crime == 1) %>% 
+  select(reported_date, district_id) %>% 
+  mutate(reported_date = lubridate::mdy_hms(reported_date)) %>%  
+  mutate(year = lubridate::year(reported_date)) %>% 
+  select(-reported_date) %>%  
+  group_by(year) %>% 
+  mutate(total = n()) %>% 
+  ungroup() %>% 
+  group_by(district_id, year, total) %>% 
+  count() %>% 
+  ungroup() %>% 
+  mutate(prop = n/total, 
+         se = sqrt(prop*(1-prop)/n))
+
+
+ggplot(plot_d2, aes(x = reorder(district_id, prop), prop)) +
+  geom_col(aes(fill = as.factor(district_id))) +
+  geom_errorbar(aes(ymin = ifelse(prop + qnorm(0.025)*se <0,
+                                  0, 
+                                  prop + qnorm(0.025)*se), 
+                    ymax = prop + qnorm(0.975)*se),
+                color = "gray40", 
+                width = 0.4, 
+                size = 0.8) +
+  scale_fill_OkabeIto(darken = -0.2) +
+  coord_flip() +
+  facet_wrap(~ year) +
+  scale_y_continuous(breaks=seq(0, .25, 0.1)) +  # Ticks from 0-10, every .25
+    theme(plot.title.position = "plot", 
+          legend.position = "none") +
+  labs(x = "District",
+       y = "Proportion",
+       title = "Crimes in Denver", 
+       caption = "Denver Crime Data Distributed via Kaggle\nhttps://www.kaggle.com/paultimothymooney/denver-crime-data")
+
+```
+
+## 4. Reproduce Dot Plot
+
+Comparing the Barnum neighborhood to the Regis neighborhood
+
+```{r dot_plot, fig.width = 10, fig.height = 8}
+
+crime <- import(pth) %>% clean_names() 
+
+model_data <- crime %>% 
+  mutate(neighborhood_id = relevel(factor(neighborhood_id), ref = "barnum"))
+
+m <- glm(is_crime ~ neighborhood_id, 
+         data = model_data,
+         family = "binomial")
+
+tidied <- broom::tidy(m)
+
+regis <- tidied %>% 
+  filter(term == "neighborhood_idregis")
+
+regis_plot <- data.frame(x = qnorm(ppoints(20), 
+      mean = regis$estimate,
+      sd = regis$std.error)) %>% 
+  mutate(neighborhood = ifelse(x <= 0, "Regis", "Barnum"))
+
+ggplot(regis_plot, aes(x)) + 
+  geom_dotplot(aes(fill = neighborhood), binwidth = 0.029) + 
+  scale_fill_OkabeIto(order = c(7, 3)) + 
+  geom_vline(xintercept = 0, color = "gray30", size = 1.4) + 
+  labs(x = "Difference in log odds of a crime being committed",
+       y = "",
+       title = "Probability of differential crime rates between neighborhoods", 
+       subtitle = "<span style = 'color : #009E73'>Regis</span> compared to <span style = 'color : #CC79A7'>Barnum</span>",
+       caption = "Each ball represents 5% probability") + 
+  theme(plot.title.position = "plot", 
+        legend.position = "none",
+        plot.subtitle = element_markdown(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank())
+  
+```
+
+## 5. Crimes against persons table 
+
+```{r table}
+unique(d$offense_category_id)
+
+person_crimes <- c("aggravated-assault", "sexual-assault", "murder", "other-crimes-against-persons")
+
+table_d <- d %>% 
+  select(offense_category_id, district_id, reported_date) %>% 
+  filter(offense_category_id %in% person_crimes) %>% 
+  mutate(district_id = as.factor(district_id)) %>%  
+  filter(district_id %in% sample(levels(district_id), 3)) %>% 
+  mutate(reported_date = lubridate::mdy_hms(reported_date)) %>%  
+  mutate(Year = lubridate::year(reported_date)) %>%  
+  select(-reported_date) %>% 
+  mutate(offense_category_id = str_to_title(str_replace_all(offense_category_id, "-", " "))) %>%   group_by(district_id, Year, offense_category_id) %>% 
+  count() %>% 
+  ungroup() %>% 
+  pivot_wider(names_from = Year, values_from = n) %>% 
+  mutate(district_id = paste0("District ", district_id))
+
+unique(table_d$offense_category_id)
+unique(table_d$district_id)
+
+table_d %>% 
+  group_by(district_id) %>% 
+  gt() %>% 
+  tab_spanner(label = "Year", 
+              columns = vars(`2014`, `2015`, `2016`, `2017`, `2018`, `2019`)) %>% 
+  cols_label(offense_category_id = "Offense") %>% 
+  cols_align(align = "left", columns = vars(offense_category_id)) %>%  
+  tab_header(title = "Crimes Against Persons in Denver: 2014 to Present",
+             subtitle = "Sample of three districts") %>% 
+  tab_source_note(source_note = md("Denver Crime Data Distributed via
+ [Kaggle](https://www.kaggle.com/paultimothymooney/denver-crime-data)"))
+
+```
+
+
