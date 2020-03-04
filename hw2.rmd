@@ -25,7 +25,8 @@ theme_set(theme_minimal(base_size = 15))
 ```{r load_data}
 
 pth <- here("crime.csv")
-d <- import(pth) %>% clean_names() 
+d <- import(pth) %>% 
+  clean_names() 
 
 ```
 
@@ -60,6 +61,9 @@ ggplot(plot_d, aes(x = reorder(offense_category_id, prop), prop)) +
        title = "Crimes in Denver", 
        caption = "Denver Crime Data Distributed via Kaggle\nhttps://www.kaggle.com/paultimothymooney/denver-crime-data")
 
+# Note that your error bars extend below 0% here. I've removed one point
+# because of that (minor, I know), but otherwise it looks great.
+
 ```
 
 ## 2. Alternative Uncertainty Visualization 
@@ -84,6 +88,9 @@ ggplot(plot_d, aes(x = reorder(offense_category_id, prop), prop)) +
        title = "Crimes in Denver", 
        caption = "Denver Crime Data Distributed via Kaggle\nhttps://www.kaggle.com/paultimothymooney/denver-crime-data")
 
+# You have the issue with error bars extending below zero again but I won't
+# dock you twice. I was actually hoping for more of a different *uncertainty*
+# display though (e.g., multiple error bars, density strips, etc.).
 ```
 
 ## 3. Reproduce Plot, crime proportion by years and district
@@ -127,6 +134,7 @@ ggplot(plot_d2, aes(x = reorder(district_id, prop), prop)) +
        title = "Crimes in Denver", 
        caption = "Denver Crime Data Distributed via Kaggle\nhttps://www.kaggle.com/paultimothymooney/denver-crime-data")
 
+# Looks great!
 ```
 
 ## 4. Reproduce Dot Plot
@@ -170,7 +178,8 @@ ggplot(regis_plot, aes(x)) +
         axis.ticks.y = element_blank(), 
         panel.grid.major.y = element_blank(), 
         panel.grid.minor.y = element_blank())
-  
+# Really nice job. I'm happy to see you were able to get the subtitle to have
+# colored text
 ```
 
 ## 5. Crimes against persons table 
@@ -208,6 +217,14 @@ table_d %>%
              subtitle = "Sample of three districts") %>% 
   tab_source_note(source_note = md("Denver Crime Data Distributed via
  [Kaggle](https://www.kaggle.com/paultimothymooney/denver-crime-data)"))
+
+
+# So you've got a couple things here that are different from my table.
+# * You don't have the same districts displayed
+# * Your rows are in a different order
+# * You have NA values rather than 0's. 
+#
+# I've removed two points here.
 
 ```
 
